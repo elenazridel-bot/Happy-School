@@ -56,6 +56,24 @@ python bot.py
 sqlite3 contacts.db "SELECT * FROM contacts;"
 ```
 
+## Деплой на Railway
+
+Код бота лежит в подпапке `school_happiness_bot/`, а не в корне репозитория,
+поэтому для сборки используются файлы в корне (`railway.json`, `Procfile`,
+`requirements.txt`), которые указывают Railway запускать
+`python school_happiness_bot/bot.py`. Менять Root Directory сервиса в
+настройках Railway не нужно — деплой запускается из корня репозитория.
+
+Что нужно сделать:
+
+1. Создать сервис в Railway и подключить этот репозиторий.
+2. В настройках сервиса добавить переменные окружения `BOT_TOKEN` (и, при
+   необходимости, `ADMIN_CHAT_ID`) — так же, как в `.env`.
+3. Задеплоить. Railway соберёт зависимости из корневого `requirements.txt`
+   (он лишь подключает `school_happiness_bot/requirements.txt`) и запустит
+   `python school_happiness_bot/bot.py` как процесс `worker` — бот работает
+   через polling, отдельный веб-порт ему не нужен.
+
 ## Структура проекта
 
 ```
