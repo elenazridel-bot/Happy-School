@@ -1,9 +1,10 @@
+import os
 from datetime import datetime, timezone
 from typing import Optional
 
 import aiosqlite
 
-DB_PATH = "contacts.db"
+DB_PATH = os.getenv("DB_PATH") or "contacts.db"
 
 CREATE_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS contacts (
