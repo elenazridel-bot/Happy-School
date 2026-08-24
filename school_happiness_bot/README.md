@@ -72,21 +72,34 @@ sqlite3 contacts.db "SELECT * FROM contacts;"
 
 ## Деплой на Railway
 
-Код бота лежит в подпапке `school_happiness_bot/`, а не в корне репозитория,
-поэтому для сборки используются файлы в корне (`railway.json`, `Procfile`,
-`requirements.txt`), которые указывают Railway запускать
-`python school_happiness_bot/bot.py`. Менять Root Directory сервиса в
-настройках Railway не нужно — деплой запускается из корня репозитория.
+Код бота лежит в подпапке `school_happiness_bot/`, а не в корне репозитория.
+В сервисе на Railway задан **Root Directory = `school_happiness_bot`** —
+рабочая директория контейнера указывает прямо на эту подпапку, поэтому
+команда запуска — **`python bot.py`**, без префикса `school_happiness_bot/`.
+
+Эта команда прописана сразу в двух местах — в `railway.json`/`Procfile`
+в корне репозитория и в `railway.json`/`Procfile` внутри самой
+`school_happiness_bot/` — чтобы не зависеть от того, откуда именно Railway
+подхватывает конфиг при заданном Root Directory. Если Root Directory
+когда-нибудь сбросят на пустой (сборка из корня репозитория), обе команды
+нужно будет вернуть к `python school_happiness_bot/bot.py`.
+
+⚠️ **Если Start Command вписан вручную в настройках сервиса**
+(Settings → Deploy → Start Command в панели Railway), это значение
+перекрывает `railway.json`/`Procfile` из репозитория и не обновится само
+по себе. Проверьте это поле: там должно быть `python bot.py`, либо поле
+стоит вовсе очистить, чтобы Railway брало команду из `railway.json`.
 
 Что нужно сделать:
 
 1. Создать сервис в Railway и подключить этот репозиторий.
 2. В настройках сервиса добавить переменные окружения `BOT_TOKEN` (и, при
    необходимости, `ADMIN_CHAT_ID`) — так же, как в `.env`.
-3. Задеплоить. Railway соберёт зависимости из корневого `requirements.txt`
-   (он лишь подключает `school_happiness_bot/requirements.txt`) и запустит
-   `python school_happiness_bot/bot.py` как процесс `worker` — бот работает
-   через polling, отдельный веб-порт ему не нужен.
+3. Задать Root Directory = `school_happiness_bot` и убедиться, что Start
+   Command не переопределён вручную (см. предупреждение выше).
+4. Задеплоить. Railway поставит зависимости из `requirements.txt` и
+   запустит бота как процесс `worker` — он работает через polling,
+   отдельный веб-порт ему не нужен.
 
 ### Volume для базы данных
 
