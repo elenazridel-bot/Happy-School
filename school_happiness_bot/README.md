@@ -72,21 +72,36 @@ sqlite3 contacts.db "SELECT * FROM contacts;"
 
 ## Деплой на Railway
 
-Код бота лежит в подпапке `school_happiness_bot/`, а не в корне репозитория,
-поэтому для сборки используются файлы в корне (`railway.json`, `Procfile`,
-`requirements.txt`), которые указывают Railway запускать
-`python school_happiness_bot/bot.py`. Менять Root Directory сервиса в
-настройках Railway не нужно — деплой запускается из корня репозитория.
+Код бота лежит в подпапке `school_happiness_bot/`, а не в корне репозитория.
+Есть два способа задеплоить, и важно не смешивать их:
+
+**Вариант А — Root Directory не задан (по умолчанию).** Railway собирает
+из корня репозитория. Используются `railway.json`, `Procfile`,
+`requirements.txt` в корне — они запускают
+`python school_happiness_bot/bot.py`.
+
+**Вариант Б — Root Directory = `school_happiness_bot`.** Тогда рабочая
+директория контейнера уже указывает прямо на подпапку, и команда должна
+быть без префикса — `python bot.py`. Для этого случая есть отдельные
+`railway.json` и `Procfile` прямо внутри `school_happiness_bot/`.
+
+⚠️ **Если вы вручную вписывали Start Command в настройках сервиса**
+(Settings → Deploy → Start Command в панели Railway), это значение
+перекрывает `railway.json`/`Procfile` из репозитория и не обновится само
+по себе. Проверьте это поле: при Root Directory = `school_happiness_bot`
+там должно быть `python bot.py` (без подпапки), либо поле стоит вовсе
+очистить, чтобы Railway брал команду из `railway.json`.
 
 Что нужно сделать:
 
 1. Создать сервис в Railway и подключить этот репозиторий.
 2. В настройках сервиса добавить переменные окружения `BOT_TOKEN` (и, при
    необходимости, `ADMIN_CHAT_ID`) — так же, как в `.env`.
-3. Задеплоить. Railway соберёт зависимости из корневого `requirements.txt`
-   (он лишь подключает `school_happiness_bot/requirements.txt`) и запустит
-   `python school_happiness_bot/bot.py` как процесс `worker` — бот работает
-   через polling, отдельный веб-порт ему не нужен.
+3. Убедиться, что Root Directory и Start Command соответствуют друг другу
+   (см. варианты А/Б выше).
+4. Задеплоить. Railway поставит зависимости из `requirements.txt` и
+   запустит бота как процесс `worker` — он работает через polling,
+   отдельный веб-порт ему не нужен.
 
 ### Volume для базы данных
 
