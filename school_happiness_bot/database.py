@@ -1,9 +1,10 @@
+import os
 from datetime import datetime, timezone
 from typing import Optional
 
 import aiosqlite
 
-DB_PATH = "contacts.db"
+DB_PATH = os.getenv("DB_PATH") or "contacts.db"
 
 CREATE_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS contacts (
@@ -51,3 +52,16 @@ async def save_contact(
             ),
         )
         await db.commit()
+
+
+async def get_all_contacts() -> list[aiosqlite.Row]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """
+            SELECT full_name, city, help_type, phone, username, created_at
+            FROM contacts
+            ORDER BY id
+            """
+        ) as cursor:
+            return await cursor.fetchall()
