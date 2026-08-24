@@ -1,1 +1,1 @@
-worker: python school_happiness_bot/bot.py
+worker: python bot.py
