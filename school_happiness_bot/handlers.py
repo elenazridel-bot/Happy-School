@@ -49,46 +49,82 @@ async def cmd_cancel(message: Message, state: FSMContext) -> None:
     )
 
 
+@router.message(Command("whoami"))
+async def cmd_whoami(message: Message) -> None:
+    await message.answer(
+        f"Ваш Telegram ID: <code>{message.from_user.id}</code>\n\n"
+        "Именно это число должно быть указано в переменной окружения "
+        "ADMIN_CHAT_ID, чтобы команда /export была доступна."
+    )
+
+
 @router.message(Command("export"))
 async def cmd_export(message: Message, config: Config) -> None:
-    if not config.admin_chat_id or message.from_user.id != config.admin_chat_id:
-        return
-
-    contacts = await get_all_contacts()
-    if not contacts:
-        await message.answer("Пока нет ни одного сохранённого контакта.")
-        return
-
-    workbook = Workbook()
-    sheet = workbook.active
-    sheet.title = "Контакты"
-    sheet.append(
-        ["Имя", "Город", "Готов(а) помочь", "Телефон", "Telegram", "Дата регистрации"]
+    user_id = message.from_user.id
+    logger.info(
+        "Запрос /export от user_id=%s, admin_chat_id из конфига=%s",
+        user_id,
+        config.admin_chat_id,
     )
-    for row in contacts:
-        username = f"@{row['username']}" if row["username"] else ""
-        sheet.append(
-            [
-                row["full_name"],
-                row["city"],
-                row["help_type"],
-                row["phone"],
-                username,
-                row["created_at"],
-            ]
+
+    if not config.admin_chat_id:
+        await message.answer(
+            "ADMIN_CHAT_ID не задан в настройках бота, поэтому /export "
+            "недоступен никому. Добавьте переменную окружения ADMIN_CHAT_ID "
+            "(узнать свой ID можно командой /whoami)."
         )
-    for column_cells in sheet.columns:
-        max_length = max(len(str(cell.value or "")) for cell in column_cells)
-        sheet.column_dimensions[column_cells[0].column_letter].width = max_length + 2
+        return
 
-    buffer = io.BytesIO()
-    workbook.save(buffer)
-    buffer.seek(0)
+    if user_id != config.admin_chat_id:
+        await message.answer(
+            f"Команда /export доступна только администратору. Ваш ID "
+            f"(<code>{user_id}</code>) не совпадает с ADMIN_CHAT_ID в "
+            "настройках бота. Проверьте значение командой /whoami."
+        )
+        return
 
-    await message.answer_document(
-        BufferedInputFile(buffer.read(), filename="school_happiness_contacts.xlsx"),
-        caption=f"Контактов: {len(contacts)}",
-    )
+    try:
+        contacts = await get_all_contacts()
+        if not contacts:
+            await message.answer("Пока нет ни одного сохранённого контакта.")
+            return
+
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "Контакты"
+        sheet.append(
+            ["Имя", "Город", "Готов(а) помочь", "Телефон", "Telegram", "Дата регистрации"]
+        )
+        for row in contacts:
+            username = f"@{row['username']}" if row["username"] else ""
+            sheet.append(
+                [
+                    row["full_name"],
+                    row["city"],
+                    row["help_type"],
+                    row["phone"],
+                    username,
+                    row["created_at"],
+                ]
+            )
+        for column_cells in sheet.columns:
+            max_length = max(len(str(cell.value or "")) for cell in column_cells)
+            sheet.column_dimensions[column_cells[0].column_letter].width = max_length + 2
+
+        buffer = io.BytesIO()
+        workbook.save(buffer)
+        buffer.seek(0)
+
+        await message.answer_document(
+            BufferedInputFile(buffer.read(), filename="school_happiness_contacts.xlsx"),
+            caption=f"Контактов: {len(contacts)}",
+        )
+    except Exception:
+        logger.exception("Не удалось сформировать/отправить экспорт контактов")
+        await message.answer(
+            "Не получилось сформировать файл — произошла ошибка. "
+            "Подробности есть в логах сервиса."
+        )
 
 
 @router.message(ContactForm.name, F.text)
