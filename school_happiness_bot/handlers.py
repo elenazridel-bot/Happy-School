@@ -1,13 +1,15 @@
+import io
 import logging
 import re
 
 from aiogram import Bot, F, Router
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import BufferedInputFile, CallbackQuery, Message
+from openpyxl import Workbook
 
 from config import Config
-from database import save_contact
+from database import get_all_contacts, save_contact
 from keyboards import (
     HELP_TYPES,
     REMOVE_KEYBOARD,
@@ -44,6 +46,48 @@ async def cmd_cancel(message: Message, state: FSMContext) -> None:
     await message.answer(
         "Диалог остановлен. Если захотите начать заново — отправьте /start.",
         reply_markup=REMOVE_KEYBOARD,
+    )
+
+
+@router.message(Command("export"))
+async def cmd_export(message: Message, config: Config) -> None:
+    if not config.admin_chat_id or message.from_user.id != config.admin_chat_id:
+        return
+
+    contacts = await get_all_contacts()
+    if not contacts:
+        await message.answer("Пока нет ни одного сохранённого контакта.")
+        return
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Контакты"
+    sheet.append(
+        ["Имя", "Город", "Готов(а) помочь", "Телефон", "Telegram", "Дата регистрации"]
+    )
+    for row in contacts:
+        username = f"@{row['username']}" if row["username"] else ""
+        sheet.append(
+            [
+                row["full_name"],
+                row["city"],
+                row["help_type"],
+                row["phone"],
+                username,
+                row["created_at"],
+            ]
+        )
+    for column_cells in sheet.columns:
+        max_length = max(len(str(cell.value or "")) for cell in column_cells)
+        sheet.column_dimensions[column_cells[0].column_letter].width = max_length + 2
+
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+    buffer.seek(0)
+
+    await message.answer_document(
+        BufferedInputFile(buffer.read(), filename="school_happiness_contacts.xlsx"),
+        caption=f"Контактов: {len(contacts)}",
     )
 
 

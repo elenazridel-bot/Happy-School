@@ -18,6 +18,10 @@ Telegram-бот на [aiogram 3](https://docs.aiogram.dev/), который пр
 
 `/cancel` в любой момент прерывает диалог.
 
+`/export` — только для администратора (тот, чей `chat_id` указан в
+`ADMIN_CHAT_ID`): бот присылает файл `school_happiness_contacts.xlsx` со
+всеми собранными контактами.
+
 ## Установка
 
 ```bash
@@ -55,6 +59,10 @@ python bot.py
 ```bash
 sqlite3 contacts.db "SELECT * FROM contacts;"
 ```
+
+Либо проще: отправить боту команду `/export` (с аккаунта, чей `chat_id`
+указан в `ADMIN_CHAT_ID`) — он пришлёт Excel-файл со всеми контактами прямо
+в чат, без доступа к серверу.
 
 ## Деплой на Railway
 
