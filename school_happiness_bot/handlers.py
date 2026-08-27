@@ -8,6 +8,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile, CallbackQuery, Message
 from openpyxl import Workbook
 
+from ai import classify_help_type, extract_name
 from config import Config
 from database import get_all_contacts, save_contact
 from keyboards import (
@@ -129,7 +130,8 @@ async def cmd_export(message: Message, config: Config) -> None:
 
 @router.message(ContactForm.name, F.text)
 async def process_name(message: Message, state: FSMContext) -> None:
-    name = message.text.strip()
+    raw_text = message.text.strip()
+    name = await extract_name(raw_text)
     if len(name) < 2:
         await message.answer("Пожалуйста, введите имя текстом (не короче 2 символов).")
         return
@@ -153,7 +155,8 @@ async def process_city(message: Message, state: FSMContext) -> None:
 
     await state.update_data(city=city)
     await message.answer(
-        "Чем вы могли бы помочь школе «Счастья»? Выберите подходящий вариант:",
+        "Чем вы могли бы помочь школе «Счастья»? Выберите подходящий вариант "
+        "кнопкой или просто опишите своими словами:",
         reply_markup=help_type_keyboard(),
     )
     await state.set_state(ContactForm.help_type)
@@ -178,6 +181,20 @@ async def process_help_type(callback: CallbackQuery, state: FSMContext) -> None:
     )
     await state.set_state(ContactForm.phone)
     await callback.answer()
+
+
+@router.message(ContactForm.help_type, F.text)
+async def process_help_type_text(message: Message, state: FSMContext) -> None:
+    key = await classify_help_type(message.text.strip())
+    label = HELP_TYPES[key]
+
+    await state.update_data(help_type=label)
+    await message.answer(
+        f"Записал: «{label}». Теперь поделитесь номером телефона — нажмите "
+        "кнопку ниже или введите номер вручную.",
+        reply_markup=phone_request_keyboard(),
+    )
+    await state.set_state(ContactForm.phone)
 
 
 @router.message(ContactForm.phone, F.contact)
