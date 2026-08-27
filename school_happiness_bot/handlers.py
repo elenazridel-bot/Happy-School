@@ -8,7 +8,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile, CallbackQuery, Message
 from openpyxl import Workbook
 
-from ai import classify_help_type, extract_name
+from ai import classify_help_type, extract_city, extract_name
 from config import Config
 from database import get_all_contacts, save_contact
 from keyboards import (
@@ -148,7 +148,8 @@ async def process_name_invalid(message: Message) -> None:
 
 @router.message(ContactForm.city, F.text)
 async def process_city(message: Message, state: FSMContext) -> None:
-    city = message.text.strip()
+    raw_text = message.text.strip()
+    city = await extract_city(raw_text)
     if len(city) < 2:
         await message.answer("Пожалуйста, укажите город текстом.")
         return

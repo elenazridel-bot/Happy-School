@@ -16,9 +16,13 @@ OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 DEFAULT_HELP_TYPE_KEY = "other"
 CLASSIFY_TEMPERATURE = 0.2
 EXTRACT_NAME_TEMPERATURE = 0.2
+EXTRACT_CITY_TEMPERATURE = 0.2
 
 # На случай опечаток вроде "3вут"/"3овут" (цифра вместо "з") при работе без ИИ.
 _NAME_PATTERN = re.compile(r"(?:меня\s+)?[з3]ов[ауе]?т\s*[:\-]?\s*(.+)", re.IGNORECASE)
+
+# Аналогично для города: "я и3 города Москвы" -> "Москвы" (без ИИ падеж не исправить).
+_CITY_PATTERN = re.compile(r"(?:я\s+)?и[з3]\s+(?:города\s+)?(.+)", re.IGNORECASE)
 
 _client: Optional[AsyncOpenAI] = None
 
@@ -34,6 +38,15 @@ def _get_client() -> Optional[AsyncOpenAI]:
 
 def _fallback_extract_name(text: str) -> str:
     match = _NAME_PATTERN.search(text)
+    if match:
+        candidate = match.group(1).strip(" .!,:;-")
+        if candidate:
+            return candidate
+    return text.strip()
+
+
+def _fallback_extract_city(text: str) -> str:
+    match = _CITY_PATTERN.search(text)
     if match:
         candidate = match.group(1).strip(" .!,:;-")
         if candidate:
@@ -105,3 +118,38 @@ async def extract_name(text: str) -> str:
         return _fallback_extract_name(text)
 
     return extracted or _fallback_extract_name(text)
+
+
+async def extract_city(text: str) -> str:
+    """Достаёт город из свободного текста и приводит к именительному падежу
+    ('Я из города Москвы' -> 'Москва')."""
+    client = _get_client()
+    if client is None:
+        return _fallback_extract_city(text)
+
+    system_prompt = (
+        "Пользователь Telegram-бота отвечает на вопрос «Из какого вы "
+        "города?». Он мог написать просто название города или целую фразу "
+        "вроде «я из города Москвы» — возможно, с опечатками. Верни ТОЛЬКО "
+        "название города в именительном падеже (например «Москва», а не "
+        "«Москвы» или «из Москвы»), без вводных слов, кавычек и знаков "
+        "препинания. Если явного названия города в сообщении нет, верни "
+        "исходный текст без изменений."
+    )
+
+    try:
+        response = await client.chat.completions.create(
+            model=OPENROUTER_MODEL,
+            temperature=EXTRACT_CITY_TEMPERATURE,
+            max_tokens=20,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": text},
+            ],
+        )
+        extracted = (response.choices[0].message.content or "").strip().strip("\"'")
+    except Exception:
+        logger.exception("Не удалось извлечь город через OpenRouter")
+        return _fallback_extract_city(text)
+
+    return extracted or _fallback_extract_city(text)
