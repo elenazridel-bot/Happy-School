@@ -10,7 +10,7 @@ from openpyxl import Workbook
 
 from ai import classify_help_type, extract_city, extract_name
 from config import Config
-from database import get_all_contacts, save_contact
+from database import deduplicate_contacts, get_all_contacts, save_contact
 from keyboards import (
     HELP_TYPES,
     REMOVE_KEYBOARD,
@@ -85,10 +85,13 @@ async def cmd_export(message: Message, config: Config) -> None:
         return
 
     try:
-        contacts = await get_all_contacts()
-        if not contacts:
+        all_contacts = await get_all_contacts()
+        if not all_contacts:
             await message.answer("Пока нет ни одного сохранённого контакта.")
             return
+
+        contacts = deduplicate_contacts(all_contacts)
+        duplicates_removed = len(all_contacts) - len(contacts)
 
         workbook = Workbook()
         sheet = workbook.active
@@ -116,9 +119,13 @@ async def cmd_export(message: Message, config: Config) -> None:
         workbook.save(buffer)
         buffer.seek(0)
 
+        caption = f"Контактов: {len(contacts)}"
+        if duplicates_removed:
+            caption += f" (объединено повторных заявок: {duplicates_removed})"
+
         await message.answer_document(
             BufferedInputFile(buffer.read(), filename="school_happiness_contacts.xlsx"),
-            caption=f"Контактов: {len(contacts)}",
+            caption=caption,
         )
     except Exception:
         logger.exception("Не удалось сформировать/отправить экспорт контактов")
